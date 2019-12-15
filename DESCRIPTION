@@ -1,0 +1,18 @@
+Package: cranium2
+Title: What the Package Does (One Line, Title Case)
+Version: 0.0.0.9000
+Authors@R: c(
+  person("Aaron", "Jacobs", role = c("aut", "cre"),
+         email = "atheriel@gmail.com"),
+  person("Nicholas", "Jhirad", role = "aut",
+         email = "lostnfound@gmail.com")
+  )
+Description: What the package does (one paragraph).
+License: MIT + file LICENSE
+Imports: 
+  httpuv,
+  mime,
+  webutils
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1
