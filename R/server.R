@@ -29,7 +29,6 @@ serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
 
   args <- list(...)
   config <- list()
-  env <- new.env(FALSE, size = 1L)
 
   config$use_archive <- args$use_archive %||% TRUE
   config$use_hardlinks <- args$use_hardlinks %||% FALSE
@@ -37,35 +36,22 @@ serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
   config$fields <- args$fields %||% required_fields
   config$repo_name <- repo_name
 
-  # Keep the package index in memory, loading it from the file if present and
-  # using an empty index otherwise.
+  # Handle correct repository initialization.
+  repo <- repository(repo, fields = config$fields)
 
-  url <- contrib.url(repo, type = "source")
-  if (!dir.exists(url)) {
-    dir.create(url, recursive = TRUE, showWarnings = FALSE)
-  }
-
-  index_path <- file.path(url, "PACKAGES.rds")
-  if (!file.exists(index_path)) {
-    cranlike::create_empty_PACKAGES(url, fields = config$fields)
-    # We could read this back from the DB instead.
-    empty <- matrix(nrow = 0, ncol = length(config$fields))
-    colnames(empty) <- config$fields
-    env$index <- empty
-    message("Created an empty repository index.")
-  } else {
-    cranlike::update_PACKAGES(url, fields = config$fields, type = "source")
-    env$index <- readRDS(index_path)
-    message("Using the existing repository contents.")
-  }
+  # Keep the package index in memory.
+  env <- new.env(FALSE, size = 1L)
+  env$index <- readRDS(
+    file.path(contrib.url(repo$path, type = "source"), "PACKAGES.rds")
+  )
 
   if (!detach) {
     httpuv::runServer(host, port, list(
-      call = router(repo, config, env)
+      call = router(repo$path, config, env)
     ))
   } else {
     httpuv::startServer(host, port, list(
-      call = router(repo, config, env)
+      call = router(repo$path, config, env)
     ))
   }
 }

@@ -1,6 +1,7 @@
 testthat::test_that("Package upload/deletion works as expected", {
   # Clean repository.
   repo <- file.path(tempfile("cranium"), "repo")
+  dir.create(repo, recursive = TRUE)
   port <- httpuv::randomPort()
   p <- start_server(repo, port)
 
