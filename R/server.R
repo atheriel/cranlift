@@ -9,7 +9,7 @@
 #' @param port The port to run the server on.
 #' @param detach Whether the server should run in the foreground or return
 #'   immediately and run in the background.
-#' @param ... Further arguments passed on to \code{\link{write_modpac}}.
+#' @param ... Further configuration options.
 #'
 #' @return
 #'
@@ -47,22 +47,19 @@ serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
 
   index_path <- file.path(url, "PACKAGES.rds")
   if (!file.exists(index_path)) {
+    cranlike::create_empty_PACKAGES(url, fields = config$fields)
+    # We could read this back from the DB instead.
     empty <- matrix(nrow = 0, ncol = length(config$fields))
     colnames(empty) <- config$fields
     env$index <- empty
     message("Created an empty repository index.")
   } else {
+    cranlike::update_PACKAGES(url, fields = config$fields, type = "source")
     env$index <- readRDS(index_path)
     message("Using the existing repository contents.")
   }
 
   if (!detach) {
-    # FIXME: This approach works with runServer but not with startServer.
-    on.exit({
-      message("Updating the on-disk repository index.")
-      saveRDS(env$index, index_path, compress = "xz")
-    })
-
     httpuv::runServer(host, port, list(
       call = router(repo, config, env)
     ))
@@ -142,9 +139,10 @@ router <- function(repo, config, env) {
         return(bad_request("Request must contain a 'file' in the form."))
       }
 
-      # Don't rely on the filename to infer the package name and version.
-      # Extract it from the archive instead.
-      temp_file <- tempfile(fileext = ".tar.gz")
+      # TODO: Have a per-session upload directory. Note that we need the
+      # filename to be package-like, otherwise desc::description$new() won't
+      # handle it correctly.
+      temp_file <- file.path(tempdir(), parsed$file$filename)
       pkg <- try({
         con <- file(temp_file, open = "wb", raw = TRUE)
         on.exit(close(con))
@@ -152,7 +150,9 @@ router <- function(repo, config, env) {
         # Make sure we wrote the whole file (even if it is large) before we
         # attempt to extract metadata from it.
         flush(con)
-        extract_description(temp_file, fields = c("Package", "Version"))
+        cranlike:::parse_package_files(
+          temp_file, NA_character_, fields = config$fields
+        )
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
@@ -171,7 +171,13 @@ router <- function(repo, config, env) {
           body = "Package already exists on the server. Use PUT to replace it."
         )
       } else {
-        # TODO: Actually copy the file to the repository.
+        # FIXME: Handle potential copying errors.
+        file.copy(temp_file, location)
+        cranlike::add_PACKAGES(
+          basename(location), dir = dirname(location), fields = config$fields
+        )
+        # Update the in-memory representation.
+        env$index <- readRDS(file.path(dirname(location), "PACKAGES.rds"))
         list(
           status = 201L,
           headers = list(
@@ -195,9 +201,7 @@ router <- function(repo, config, env) {
         return(bad_request("Request must contain a 'file' in the form."))
       }
 
-      # Don't rely on the filename to infer the package name and version.
-      # Extract it from the archive instead.
-      temp_file <- tempfile(fileext = ".tar.gz")
+      temp_file <- file.path(tempdir(), parsed$file$filename)
       pkg <- try({
         con <- file(temp_file, open = "wb", raw = TRUE)
         on.exit(close(con))
@@ -205,7 +209,9 @@ router <- function(repo, config, env) {
         # Make sure we wrote the whole file (even if it is large) before we
         # attempt to extract metadata from it.
         flush(con)
-        extract_description(temp_file, fields = c("Package", "Version"))
+        cranlike:::parse_package_files(
+          temp_file, NA_character_, fields = config$fields
+        )
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
@@ -217,42 +223,40 @@ router <- function(repo, config, env) {
         return(bad_request("URI does not match the upload contents."))
       }
 
-      res <- if (file.exists(location)) {
-        # TODO: Actually copy the file to the repository.
-        list(
-          status = 200L,
-          headers = list(
-            "Content-Type" = "text/plain; charset=utf-8",
-            "Location" = paste0("/src/contrib/", bundle)
-          ),
-          body = ""
-        )
-      } else {
-        # TODO: Actually copy the file to the repository.
-        list(
-          status = 201L,
-          headers = list(
-            "Content-Type" = "text/plain; charset=utf-8",
-            "Location" = paste0("/src/contrib/", bundle)
-          ),
-          body = ""
-        )
-      }
-      return(res)
+      status <- if (file.exists(location)) 200L else 201L
+      # FIXME: Handle potential copying errors.
+      file.copy(temp_file, location)
+      cranlike::add_PACKAGES(
+        basename(location), dir = dirname(location), fields = config$fields
+      )
+      # Update the in-memory representation.
+      env$index <- readRDS(file.path(dirname(location), "PACKAGES.rds"))
+      return(list(
+        status = status,
+        headers = list(
+          "Content-Type" = "text/plain; charset=utf-8",
+          "Location" = paste0("/src/contrib/", bundle)
+        ),
+        body = raw(0)
+      ))
     }
 
     if (req$REQUEST_METHOD == "DELETE" && grepl("^/src", path)) {
       location <- file.path(repo, sub("^/", "", path))
 
       res <- if (file.exists(location)) {
-        # TODO: Decide how to implement this.
+        # TODO: Make it possible to automatically archive deleted packages.
+        cranlike::remove_PACKAGES(basename(location), dirname(location))
+
+        # Update the in-memory representation.
+        env$index <- readRDS(file.path(dirname(location), "PACKAGES.rds"))
         list(
-          status = 403L,
+          status = 200L,
           headers = list(
             "Content-Type" = "text/plain; charset=utf-8",
             "Location" = path
           ),
-          body = "Package deletion is not permitted."
+          body = raw(0)
         )
       } else {
         not_found()

@@ -20,7 +20,7 @@ files.}
 \item{detach}{Whether the server should run in the foreground or return
 immediately and run in the background.}
 
-\item{...}{Further arguments passed on to \code{\link{write_modpac}}.}
+\item{...}{Further configuration options.}
 }
 \value{
 When \code{detach = TRUE}, this function returns a handle that can be passed
