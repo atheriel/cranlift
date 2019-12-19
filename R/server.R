@@ -22,8 +22,7 @@
 serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
                   detach = FALSE, ...) {
   if (!requireNamespace("httpuv", quietly = TRUE) ||
-      !requireNamespace("webutils", quietly = TRUE) ||
-      !requireNamespace("mime", quietly = TRUE)) {
+      !requireNamespace("webutils", quietly = TRUE)) {
     stop(paste0("The 'httpuv', 'webutils', and 'mime' packages are required ",
                 "to run the cranium server."))
   }
@@ -121,7 +120,8 @@ router <- function(repo, config, env) {
         list(
           status = 200L,
           headers = list(
-            "Content-Type" = mime::guess_type(location),
+            # This is what CRAN uses as a mime type for src packages.
+            "Content-Type" = "x-gzip",
             # Send the real content length for HEAD requests.
             # See: https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
             "Content-Length" = size
