@@ -140,24 +140,27 @@ router <- function(repo, config, env) {
       }
 
       # TODO: Have a per-session upload directory. Note that we need the
-      # filename to be package-like, otherwise desc::description$new() won't
-      # handle it correctly.
+      # temporary filename to be package-like, otherwise desc::description$new()
+      # won't handle it correctly.
       temp_file <- file.path(tempdir(), parsed$file$filename)
+      con <- file(temp_file, open = "wb", raw = TRUE)
+      on.exit(close(con))
+      writeBin(parsed$file$value, con)
+      # Make sure we wrote the whole file (even if it is large) before we
+      # attempt to extract metadata from it.
+      flush(con)
+
+      # TODO: The only reason we do this at the moment is to "validate" the
+      # package. We don't do anything with the result as of yet. Should we?
       pkg <- try({
-        con <- file(temp_file, open = "wb", raw = TRUE)
-        on.exit(close(con))
-        writeBin(parsed$file$value, con)
-        # Make sure we wrote the whole file (even if it is large) before we
-        # attempt to extract metadata from it.
-        flush(con)
-        cranlike:::parse_package_files(
-          temp_file, NA_character_, fields = config$fields
-        )
+        desc <- desc::description$new(temp_file)
+        desc$get(config$fields)
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
         return(bad_request("Invalid package bundle."))
       }
+      pkg <- as.data.frame(t(pkg), stringsAsFactors = FALSE)
 
       bundle <- sprintf("%s_%s.tar.gz", pkg$Package, pkg$Version)
       location <- file.path(contrib.url(repo, type = "source"), bundle)
@@ -202,21 +205,22 @@ router <- function(repo, config, env) {
       }
 
       temp_file <- file.path(tempdir(), parsed$file$filename)
+      con <- file(temp_file, open = "wb", raw = TRUE)
+      on.exit(close(con))
+      writeBin(parsed$file$value, con)
+      # Make sure we wrote the whole file (even if it is large) before we
+      # attempt to extract metadata from it.
+      flush(con)
+
       pkg <- try({
-        con <- file(temp_file, open = "wb", raw = TRUE)
-        on.exit(close(con))
-        writeBin(parsed$file$value, con)
-        # Make sure we wrote the whole file (even if it is large) before we
-        # attempt to extract metadata from it.
-        flush(con)
-        cranlike:::parse_package_files(
-          temp_file, NA_character_, fields = config$fields
-        )
+        desc <- desc::description$new(temp_file)
+        desc$get(config$fields)
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
         return(bad_request("Invalid package bundle."))
       }
+      pkg <- as.data.frame(t(pkg), stringsAsFactors = FALSE)
 
       bundle <- sprintf("%s_%s.tar.gz", pkg$Package, pkg$Version)
       if (basename(location) != bundle) {
