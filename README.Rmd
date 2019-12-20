@@ -1,0 +1,92 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+# cranlift: Serve CRAN-like Repositories as RESTful APIs
+
+<!-- badges: start -->
+[![CRAN status](https://www.r-pkg.org/badges/version/cranlift)](https://cran.r-project.org/package=cranlift)
+<!-- badges: end -->
+
+Like the `miniCRAN` and `drat` packages, `cranlift` allows users to manage their
+own CRAN-like R package archives. However, `cranlift` does so by running a
+fully-featured API server that exposes packages as resources that can be added,
+deleted, and modified using HTTP requests, in line with RESTful design
+principles.
+
+`cranlift` supports both source and binary packages, as well as CRAN's Archive
+layout for storing old versions of packages.
+
+## Installation
+
+`cranlift` is not yet available on [CRAN](https://CRAN.R-project.org). For now,
+you can install the development version from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("atheriel/cranlift")
+```
+
+## Usage
+
+To serve an (empty) CRAN-like repository, call `cranlift::serve()`:
+
+```{r example-available}
+# You could use two R processes for this instead of callr::r_bg().
+p <- callr::r_bg(function() {
+  dir.create("/tmp/myrepo", FALSE)
+  cranlift::serve("/tmp/myrepo", port = 8000)
+}, supervise = TRUE)
+
+nrow(available.packages(repos = "http://127.0.0.1:8000"))
+```
+
+Now let's add an example package to the repository, say `miniCRAN`. Because
+we're interacting with a server, we do this with an HTTP request:
+
+```{r example-add}
+path <- download.packages("miniCRAN", tempdir(), type = "source")[1,2]
+httr::PUT(
+  sprintf("127.0.0.1:8000/src/contrib/%s", basename(path)),
+  body = list(file = httr::upload_file(path))
+)
+
+nrow(available.packages(
+  repos = "http://127.0.0.1:8000", ignore_repo_cache = TRUE
+))
+```
+
+Deleting a package (say, because a new version is available) works similarly:
+
+```{r example-delete}
+httr::DELETE(
+  sprintf("127.0.0.1:8000/src/contrib/%s", basename(path))
+)
+
+nrow(available.packages(
+  repos = "http://127.0.0.1:8000", ignore_repo_cache = TRUE
+))
+```
+
+By default, deleted packages will be moved to the archive:
+
+```{r example-archive}
+httr::HEAD(sprintf(
+  "127.0.0.1:8000/src/contrib/Archive/miniCRAN/%s", basename(path)
+))
+```
+
+## License
+
+`cranlift` is made available under the terms of the MIT license. See the
+`LICENSE.md` file for details.
