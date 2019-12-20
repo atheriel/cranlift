@@ -6,20 +6,43 @@ repository <- function(path, fields = NULL) {
     stop("No repository exists at '", path, "'.", call. = FALSE)
   }
   out <- structure(
-    list(path = path, fields = fields), class = "cranium_repository"
+    list(path = path, fields = fields, contrib_urls = character()),
+    class = "cranium_repository"
   )
 
-  # Ensure that the repository has a functioning index.
-  # TODO: Support binary packages.
+  # Ensure that the repository has a functioning index for source and binary
+  # packages (that match the local R version).
 
-  src_url <- contrib.url(out$path, type = "source")
-  if (!dir.exists(src_url)) {
-    dir.create(src_url, recursive = TRUE, showWarnings = FALSE)
+  for (type in c("source", "mac.binary", "win.binary")) {
+    url <- contrib.url(out$path, type = type)
+    if (!dir.exists(url)) {
+      dir.create(url, recursive = TRUE, showWarnings = FALSE)
+    }
+    out$contrib_urls <- c(out$contrib_urls, url)
+
+    if (!file.exists(file.path(url, "PACKAGES.rds"))) {
+      cranlike::create_empty_PACKAGES(url, fields = out$fields)
+    }
   }
 
-  if (!file.exists(file.path(src_url, "PACKAGES.rds"))) {
-    cranlike::create_empty_PACKAGES(src_url, fields = out$fields)
-  } else {
-    cranlike::update_PACKAGES(src_url, fields = out$fields, type = "source")
+  # Catch binary packages for R versions that don't match the local one. These
+  # indexes need to be up-to-date as well. Since PACKAGES is the oldest index
+  # format, look for that one in particular.
+
+  index_dirs <- dirname(
+    list.files(out$path, "PACKAGES$", recursive = TRUE, full.names = TRUE)
+  )
+  for (url in setdiff(index_dirs, out$contrib_urls)) {
+    type <- if (grepl("bin/windows", url, fixed = TRUE)) {
+      "win.binary"
+    } else if (grepl("bin/macosx/el-capitan", url, fixed = TRUE)) {
+      "mac.binary.el-capitan"
+    } else {
+      "mac.binary"
+    }
+    cranlike::update_PACKAGES(url, fields = out$fields, type = type)
   }
+
+  out$contrib_urls <- index_dirs
+  out
 }
