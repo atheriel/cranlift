@@ -9,7 +9,9 @@
 #' @param port The port to run the server on.
 #' @param detach Whether the server should run in the foreground or return
 #'   immediately and run in the background.
-#' @param ... Further configuration options.
+#' @param use_archive Whether old source packages should be moved to an Archive.
+#' @param fields Metadata for each package to add to the index. When
+#'   \code{NULL}, use the defaults. See \code{\link[tools]{write_PACKAGES}}.
 #'
 #' @return
 #'
@@ -20,15 +22,12 @@
 #' @export
 #' @importFrom utils contrib.url
 serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
-                  detach = FALSE, ...) {
-  args <- list(...)
-  config <- list()
-
-  config$use_archive <- args$use_archive %||% TRUE
-  config$use_hardlinks <- args$use_hardlinks %||% FALSE
-  config$latest_only <- args$latest_only %||% FALSE
-  config$fields <- args$fields %||% required_fields
-  config$repo_name <- repo_name
+                  detach = FALSE, use_archive = TRUE, fields = NULL) {
+  config <- list(
+    use_archive = use_archive %||% TRUE,
+    fields = fields %||% required_fields,
+    repo_name = repo_name
+  )
 
   # Handle correct repository initialization.
   repo <- repository(repo, fields = config$fields)

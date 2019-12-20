@@ -5,7 +5,7 @@
 \title{Serve a CRAN-like Package Repository}
 \usage{
 serve(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
-  detach = FALSE, ...)
+  detach = FALSE, use_archive = TRUE, fields = NULL)
 }
 \arguments{
 \item{repo}{The location of the package repository.}
@@ -20,7 +20,10 @@ files.}
 \item{detach}{Whether the server should run in the foreground or return
 immediately and run in the background.}
 
-\item{...}{Further configuration options.}
+\item{use_archive}{Whether old source packages should be moved to an Archive.}
+
+\item{fields}{Metadata for each package to add to the index. When
+\code{NULL}, use the defaults. See \code{\link[tools]{write_PACKAGES}}.}
 }
 \value{
 When \code{detach = TRUE}, this function returns a handle that can be passed
