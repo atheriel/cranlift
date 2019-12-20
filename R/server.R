@@ -23,35 +23,34 @@
 #' @importFrom utils contrib.url
 serve <- function(repo, repo_name = "Cranlift", host = "127.0.0.1", port = 8000,
                   detach = FALSE, use_archive = TRUE, fields = NULL) {
-  config <- list(
-    use_archive = use_archive %||% TRUE,
-    fields = fields %||% required_fields,
-    repo_name = repo_name
+  server <- Server$new(
+    repo = repo, repo_name = repo_name, use_archive = use_archive,
+    fields = fields
   )
-
-  # Handle correct repository initialization.
-  repo <- repository(repo, fields = config$fields)
-
-  # Keep the package index in memory.
-  env <- new.env(FALSE, size = 1L)
-  env$index <- lapply(repo$contrib_urls, function(url) {
-    readRDS(file.path(url, "PACKAGES.rds"))
-  })
-  names(env$index) <- repo$contrib_urls
-
-  if (!detach) {
-    httpuv::runServer(host, port, list(
-      call = router(repo$path, config, env)
-    ))
-  } else {
-    httpuv::startServer(host, port, list(
-      call = router(repo$path, config, env)
-    ))
-  }
+  server$run(host = host, port = port, detach = detach)
 }
 
-router <- function(repo, config, env) {
-  function(req) {
+Server <- R6::R6Class("Server", public = list(
+  initialize = function(repo, repo_name = "Cranium", use_archive = TRUE,
+                        fields = NULL) {
+    private$repo_name <- repo_name
+    private$use_archive <- use_archive
+    private$fields <- fields %||% required_fields
+    private$repo <- repository(repo, fields = fields)
+    # Keep the package index in memory.
+    private$index <- lapply(private$repo$contrib_urls, function(url) {
+      readRDS(file.path(url, "PACKAGES.rds"))
+    })
+    names(private$index) <- private$repo$contrib_urls
+  },
+  run = function(host = "127.0.0.1", port = 8000, detach = FALSE) {
+    if (!detach) {
+      httpuv::runServer(host, port, self)
+    } else {
+      httpuv::startServer(host, port, self)
+    }
+  },
+  call = function(req) {
     path <- httpuv::decodeURIComponent(req$PATH_INFO)
     Encoding(path) <- "UTF-8"
 
@@ -63,13 +62,13 @@ router <- function(repo, config, env) {
     # date vis-a-vis this server.
     if (req$REQUEST_METHOD %in% c("GET", "HEAD") &&
           grepl("PACKAGES.rds$", path)) {
-      location <- file.path(repo, sub("^/", "", path))
-      if (!dirname(location) %in% names(env$index)) {
+      location <- file.path(private$repo$path, sub("^/", "", path))
+      if (!dirname(location) %in% names(private$index)) {
         return(not_found())
       }
       if (req$REQUEST_METHOD == "GET") {
         # NOTE: We're not using the traditional compression here.
-        body <- serialize(env$index[[dirname(location)]], connection = NULL)
+        body <- serialize(private$index[[dirname(location)]], connection = NULL)
       } else {
         body <- raw(0)
       }
@@ -91,7 +90,7 @@ router <- function(repo, config, env) {
 
     # Here's a nickel kid, use a real web server instead.
     if (req$REQUEST_METHOD %in% c("GET", "HEAD")) {
-      location <- file.path(repo, sub("^/", "", path))
+      location <- file.path(private$repo$path, sub("^/", "", path))
       res <- if (file.exists(location)) {
         size <- file.info(location)[, "size"]
         if (req$REQUEST_METHOD == "GET") {
@@ -139,7 +138,7 @@ router <- function(repo, config, env) {
       # package. We don't do anything with the result as of yet. Should we?
       pkg <- try({
         desc <- desc::description$new(temp_file)
-        desc$get(config$fields)
+        desc$get(private$fields)
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
@@ -148,7 +147,7 @@ router <- function(repo, config, env) {
       pkg <- as.data.frame(t(pkg), stringsAsFactors = FALSE)
 
       bundle <- sprintf("%s_%s.tar.gz", pkg$Package, pkg$Version)
-      location <- file.path(contrib.url(repo, type = "source"), bundle)
+      location <- file.path(contrib.url(private$repo$path, type = "source"), bundle)
       res <- if (file.exists(location)) {
         list(
           status = 409L,
@@ -162,10 +161,10 @@ router <- function(repo, config, env) {
         # FIXME: Handle potential copying errors.
         file.copy(temp_file, location)
         cranlike::add_PACKAGES(
-          basename(location), dir = dirname(location), fields = config$fields
+          basename(location), dir = dirname(location), fields = private$fields
         )
         # Update the in-memory representation.
-        env$index[[dirname(location)]] <- readRDS(
+        private$index[[dirname(location)]] <- readRDS(
           file.path(dirname(location), "PACKAGES.rds")
         )
         list(
@@ -181,8 +180,8 @@ router <- function(repo, config, env) {
     }
 
     if (req$REQUEST_METHOD == "PUT") {
-      location <- file.path(repo, sub("^/", "", path))
-      if (!dirname(location) %in% names(env$index)) {
+      location <- file.path(private$repo$path, sub("^/", "", path))
+      if (!dirname(location) %in% names(private$index)) {
         # TODO: Allow for creating valid new contrib URLs with an empty index.
         return(bad_request("URI does not match the repository structure."))
       }
@@ -202,7 +201,7 @@ router <- function(repo, config, env) {
 
       pkg <- try({
         desc <- desc::description$new(temp_file)
-        desc$get(config$fields)
+        desc$get(private$fields)
       })
       if (inherits(pkg, "try-error")) {
         # TODO: Log the error.
@@ -223,10 +222,10 @@ router <- function(repo, config, env) {
       # FIXME: Handle potential copying errors.
       file.copy(temp_file, location)
       cranlike::add_PACKAGES(
-        basename(location), dir = dirname(location), fields = config$fields
+        basename(location), dir = dirname(location), fields = private$fields
       )
       # Update the in-memory representation.
-      env$index[[dirname(location)]] <- readRDS(
+      private$index[[dirname(location)]] <- readRDS(
         file.path(dirname(location), "PACKAGES.rds")
       )
       return(list(
@@ -240,14 +239,14 @@ router <- function(repo, config, env) {
     }
 
     if (req$REQUEST_METHOD == "DELETE") {
-      location <- file.path(repo, sub("^/", "", path))
+      location <- file.path(private$repo$path, sub("^/", "", path))
 
       if (grepl("PACKAGES", location, fixed = TRUE)) {
         return(bad_request("Package indices cannot be deleted."))
       }
 
       res <- if (file.exists(location)) {
-        if (config$use_archive) {
+        if (private$use_archive) {
           # TODO: Is there a more cannonical regex we can use?
           regexp <- "([^_]+)_([0-9\\.]+)\\.(tar\\.gz|zip|tgz)"
           if (!grepl(regexp, basename(location))) {
@@ -267,7 +266,7 @@ router <- function(repo, config, env) {
         } else {
           cranlike::remove_PACKAGES(basename(location), dirname(location))
           # Update the in-memory representation.
-          env$index[[dirname(location)]] <- readRDS(
+          private$index[[dirname(location)]] <- readRDS(
             file.path(dirname(location), "PACKAGES.rds")
           )
         }
@@ -288,7 +287,13 @@ router <- function(repo, config, env) {
 
     not_found()
   }
-}
+), private = list(
+  repo = NULL,
+  index = NULL,
+  repo_name = NULL,
+  use_archive = NULL,
+  fields = NULL
+))
 
 ping <- function() {
   list(status = 200L, body = "", headers = list(
