@@ -60,3 +60,24 @@ testthat::test_that("Package upload/deletion works as expected", {
 
   p$kill()
 })
+
+testthat::test_that("Non-package files can't be DELETEd.", {
+  port <- httpuv::randomPort()
+  p <- start_server("/tmp/repo1", port)
+
+  response <- httr::DELETE(
+    sprintf("127.0.0.1:%d/src/contrib/PACKAGES.rds", port),
+    httr::timeout(3)
+  )
+  testthat::expect_equal(httr::status_code(response), 400)
+  testthat::expect_true(httr::has_content(response))
+
+  response <- httr::DELETE(
+    sprintf("127.0.0.1:%d/src/contrib/PACKAGES", port),
+    httr::timeout(3)
+  )
+  testthat::expect_equal(httr::status_code(response), 400)
+  testthat::expect_true(httr::has_content(response))
+
+  p$kill()
+})

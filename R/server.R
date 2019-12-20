@@ -249,6 +249,10 @@ router <- function(repo, config, env) {
     if (req$REQUEST_METHOD == "DELETE" && grepl("^/src", path)) {
       location <- file.path(repo, sub("^/", "", path))
 
+      if (grepl("PACKAGES", location, fixed = TRUE)) {
+        return(bad_request("Package indices cannot be deleted."))
+      }
+
       res <- if (file.exists(location)) {
         # TODO: Make it possible to automatically archive deleted packages.
         cranlike::remove_PACKAGES(basename(location), dirname(location))
