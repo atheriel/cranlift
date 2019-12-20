@@ -12,7 +12,7 @@ License: MIT + file LICENSE
 Imports: 
   cranlike,
   desc,
-  httpuv,
+  httpuv (>= 1.5.2),
   webutils
 Suggests:
   callr,
