@@ -1,5 +1,5 @@
-Package: cranium2
-Title: What the Package Does (One Line, Title Case)
+Package: cranlift
+Title: Serve a 'CRAN'-Like Repository as a RESTful API
 Version: 0.0.0.9000
 Authors@R: c(
   person("Aaron", "Jacobs", role = c("aut", "cre"),
@@ -7,7 +7,11 @@ Authors@R: c(
   person("Nicholas", "Jhirad", role = "aut",
          email = "lostnfound@gmail.com")
   )
-Description: What the package does (one paragraph).
+Description: Like the 'miniCRAN' and 'drat' packages, 'cranlift' allows
+  users to manage their own 'CRAN'-like R package archives. However,
+  'cranlift' does so by running a fully-featured API server that exposes
+  packages as resources that can be added, deleted, and modified using
+  HTTP requests, in line with 'RESTful' design principles.
 License: MIT + file LICENSE
 Imports: 
   cranlike,

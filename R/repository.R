@@ -7,7 +7,7 @@ repository <- function(path, fields = NULL) {
   }
   out <- structure(
     list(path = path, fields = fields, contrib_urls = character()),
-    class = "cranium_repository"
+    class = "cranlift_repository"
   )
 
   # Ensure that the repository has a functioning index for source and binary

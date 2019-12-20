@@ -21,7 +21,7 @@
 #'
 #' @export
 #' @importFrom utils contrib.url
-serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
+serve <- function(repo, repo_name = "Cranlift", host = "127.0.0.1", port = 8000,
                   detach = FALSE, use_archive = TRUE, fields = NULL) {
   config <- list(
     use_archive = use_archive %||% TRUE,

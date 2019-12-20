@@ -4,7 +4,7 @@
 \alias{serve}
 \title{Serve a CRAN-like Package Repository}
 \usage{
-serve(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
+serve(repo, repo_name = "Cranlift", host = "127.0.0.1", port = 8000,
   detach = FALSE, use_archive = TRUE, fields = NULL)
 }
 \arguments{

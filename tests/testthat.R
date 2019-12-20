@@ -1,4 +1,4 @@
 library(testthat)
-library(cranium2)
+library(cranlift)
 
-test_check("cranium2")
+test_check("cranlift")
