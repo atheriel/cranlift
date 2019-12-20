@@ -21,12 +21,6 @@
 #' @importFrom utils contrib.url
 serve <- function(repo, repo_name = "Cranium", host = "127.0.0.1", port = 8000,
                   detach = FALSE, ...) {
-  if (!requireNamespace("httpuv", quietly = TRUE) ||
-      !requireNamespace("webutils", quietly = TRUE)) {
-    stop(paste0("The 'httpuv', 'webutils', and 'mime' packages are required ",
-                "to run the cranium server."))
-  }
-
   args <- list(...)
   config <- list()
 
