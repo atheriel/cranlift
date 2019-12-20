@@ -254,11 +254,29 @@ router <- function(repo, config, env) {
       }
 
       res <- if (file.exists(location)) {
-        # TODO: Make it possible to automatically archive deleted packages.
-        cranlike::remove_PACKAGES(basename(location), dirname(location))
+        if (config$use_archive) {
+          # TODO: Is there a more cannonical regex we can use?
+          regexp <- "([^_]+)_([0-9\\.]+)\\.(tar\\.gz|zip|tgz)"
+          if (!grepl(regexp, basename(location))) {
+            stop("Unexpected package path format: ", basename(location))
+          }
+          name <- sub(regexp, "\\1", basename(location))
+          archive <- file.path(dirname(location), "Archive", name)
+          dir.create(archive, showWarnings = FALSE, recursive = TRUE)
+          file.copy(
+            location, file.path(archive, basename(location)), copy.date = TRUE
+          )
+        }
 
-        # Update the in-memory representation.
-        env$index <- readRDS(file.path(dirname(location), "PACKAGES.rds"))
+        # Files can be deleted from the archive by default.
+        if (grepl("Archive", location)) {
+          unlink(location)
+        } else {
+          cranlike::remove_PACKAGES(basename(location), dirname(location))
+          # Update the in-memory representation.
+          env$index <- readRDS(file.path(dirname(location), "PACKAGES.rds"))
+        }
+
         list(
           status = 200L,
           headers = list(

@@ -58,6 +58,22 @@ testthat::test_that("Package upload/deletion works as expected", {
   testthat::expect_equal(httr::status_code(response), 404)
   testthat::expect_false(httr::has_content(response))
 
+  # And now it's in the Archive.
+  response <- httr::HEAD(
+    sprintf("127.0.0.1:%d/src/contrib/Archive/cranium2/%s", port, pkg),
+    httr::timeout(3)
+  )
+  testthat::expect_equal(httr::status_code(response), 200)
+  testthat::expect_false(httr::has_content(response))
+
+  # Which we can also DELETE.
+  response <- httr::DELETE(
+    sprintf("127.0.0.1:%d/src/contrib/Archive/cranium2/%s", port, pkg),
+    httr::timeout(3)
+  )
+  testthat::expect_equal(httr::status_code(response), 200)
+  testthat::expect_false(httr::has_content(response))
+
   p$kill()
 })
 
