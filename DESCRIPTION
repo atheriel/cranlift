@@ -20,7 +20,9 @@ Imports:
   webutils
 Suggests:
   callr,
+  drat,
   httr,
+  miniCRAN,
   testthat
 Encoding: UTF-8
 LazyData: true
