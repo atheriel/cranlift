@@ -41,13 +41,22 @@ devtools::install_github("atheriel/cranlift")
 
 To serve an (empty) CRAN-like repository, call `cranlift::serve()`:
 
-```{r example-available}
-# You could use two R processes for this instead of callr::r_bg().
+```{r example-serve, eval = FALSE}
+dir.create(repo <- tempfile("repo"))
+cranlift::serve(repo, port = 8000)
+```
+```{r bg-serve, echo = FALSE}
 p <- callr::r_bg(function() {
-  dir.create("/tmp/myrepo", FALSE)
-  cranlift::serve("/tmp/myrepo", port = 8000)
+  dir.create(repo <- tempfile("repo"))
+  cranlift::serve(repo, port = 8000)
 }, supervise = TRUE)
+stopifnot(p$is_alive())
+```
 
+You can then verify that R sees it as a package repository (with zero packages
+at the moment):
+
+```{r example-available}
 nrow(available.packages(repos = "http://127.0.0.1:8000"))
 ```
 
